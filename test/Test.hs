@@ -19,7 +19,10 @@ import           Test.HUnit                     ( Test
                                                 )
 import           Types                          ( Action(Action)
                                                 , Game(Game)
-                                                , GameError(InProgress)
+                                                , GameError
+                                                  ( InProgress
+                                                  , InvalidAction
+                                                  )
                                                 , Players
                                                 , act
                                                 , gameState
@@ -39,10 +42,7 @@ testSimpleGameOnInputs
   -> SimpleGame s r
   -> Test
 testSimpleGameOnInputs desc expected inputs game =
-  TestCase
-    $   assertEqual desc expected
-    $   traverse (`getAction` acns) inputs
-    >>= flip play game
+  TestCase $ assertEqual desc expected $ play inputs game
   where acns = game ^. initial
 
 {-
@@ -55,16 +55,22 @@ flipTheSwitch :: Game Bool Bool
 flipTheSwitch = mkSimpleGame (Map.singleton "flip" flipIt) False (== True) id
 
 testPlay :: Test
-testPlay = testSimpleGameOnInputs "for play flipTheSwitch,"
+testPlay = testSimpleGameOnInputs "for flipTheSwitch,"
                                   (Right True)
                                   ["flip"]
                                   flipTheSwitch
 
 testPlayEmpty :: Test
-testPlayEmpty = testSimpleGameOnInputs
-  "for play flipTheSwitch with no input,"
-  (Left InProgress)
-  []
+testPlayEmpty = testSimpleGameOnInputs "for flipTheSwitch with no input,"
+                                       (Left InProgress)
+                                       []
+                                       flipTheSwitch
+
+testBadAction :: Test
+testBadAction = testSimpleGameOnInputs
+  "for flipTheSwitch with a misspelled action,"
+  (Left InvalidAction)
+  ["fip"]
   flipTheSwitch
 
 {-
@@ -93,6 +99,7 @@ tests :: Test
 tests = TestList
   [ TestLabel "test play"                testPlay
   , TestLabel "test play (empty case)"   testPlayEmpty
+  , TestLabel "test invalid action"      testBadAction
   , TestLabel "test voting"              testVoting
   , TestLabel "test voting (empty case)" testVotingEmpty
   ]
