@@ -22,10 +22,9 @@ import           Types                          ( Action(Action)
                                                   )
                                                 , Players
                                                 , act
-                                                , gameState
                                                 , getAction
                                                 , initial
-                                                , play, mkGame
+                                                , play
                                                 )
 import           Voting                         ( mkVoting )
 
@@ -46,10 +45,10 @@ testSimpleGameOnInputs desc expected inputs game =
   Tests for a very basic game
 -}
 flipIt :: Action Bool
-flipIt = Action (const True) $ gameState %~ not
+flipIt = Action (const True) not
 
 flipTheSwitch :: Game Bool Bool
-flipTheSwitch = mkGame (Map.singleton "flip" flipIt) False (== True) id
+flipTheSwitch = Game (Map.singleton "flip" flipIt) False (== True) id
 
 testPlay :: Test
 testPlay = testSimpleGameOnInputs "for flipTheSwitch,"

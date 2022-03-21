@@ -21,12 +21,10 @@ import           Types                          ( Action(Action)
                                                 , ActionName
                                                 , ActionSet
                                                 , Game(Game)
-                                                , GameState(GameState)
                                                 , Player
                                                 , PlayerName
                                                 , Players
                                                 , alive
-                                                , gameState, mkGame
                                                 )
 import           Util                           ( tally )
 
@@ -46,8 +44,6 @@ data VotingState p = VotingState
 
 $(makeLenses ''VotingState)
 
-type VotingState' p = GameState (VotingState p)
-
 showVote :: Vote -> Text
 showVote HasntVoted      = "HasntVoted"
 showVote Pass            = "pass"
@@ -66,7 +62,7 @@ mkActions ps = Map.fromList $ plist >>= mkOnce
 
 mkVoteAction :: PlayerName -> Vote -> Action (VotingState p)
 mkVoteAction plr vote =
-  Action (const True) $ gameState . votes %~ Map.insert plr vote
+  Action (const True) $ votes %~ Map.insert plr vote
 
 mkVoteActionName :: PlayerName -> Vote -> ActionName
 mkVoteActionName plr vote = "vote " <> plr <> " " <> showVote vote
@@ -90,4 +86,4 @@ doWin st = case majority st of
   _                   -> Nothing
 
 mkVoting :: Players p -> Game (VotingState p) (Maybe PlayerName)
-mkVoting ps = mkGame (mkActions ps) (mkInitial ps) overWhen doWin
+mkVoting ps = Game (mkActions ps) (mkInitial ps) overWhen doWin

@@ -37,56 +37,41 @@ type PlayerName = Text
 type Players p = Map PlayerName p
 
 data Game s r = Game
-  { _initial :: GameState s
+  { _actions :: ActionSet s
+  , _initial :: s
   , _isOver  :: s -> Bool
   , _onWin   :: s -> r
   }
   deriving Generic
 
-data GameState s = GameState
-  { _actions   :: ActionSet s
-  , _gameState :: s
-  }
-  deriving Generic
-
 data Action s = Action
   { useable :: s -> Bool
-  , action  :: GameState s -> GameState s
+  , action  :: s -> s
   }
 
 type ActionName = Text
 type ActionSet s = Map ActionName (Action s)
 
-$(makeLenses ''GameState)
 $(makeLenses ''Game)
 
-act :: Monad m => Action s -> StateT (GameState s) m ()
+act :: Monad m => Action s -> StateT s m ()
 act (Action usbl acn) = do
-  ok <- gets $ usbl . _gameState
+  ok <- gets usbl
   when ok $ modify acn
 
-tryToEnd :: Game s r -> GameState s -> Either GameError r
+tryToEnd :: Game s r -> s -> Either GameError r
 tryToEnd game st =
-  if game ^. isOver $ st^.gameState then return $ game ^. onWin $ st^.gameState else Left InProgress
+  if game ^. isOver $ st then return $ game ^. onWin $ st else Left InProgress
 
 play :: [ActionName] -> Game s r -> Either GameError r
 play []       game = tryToEnd game $ game ^. initial
 play (x : xs) game = flip evalStateT (game ^. initial) $ do
-  st <- get
-  acn <- liftEither $ getAction x st
+  acn <- liftEither $ getAction x game
   act acn
   st <- get
   case tryToEnd game st of
     Left  _ -> liftEither $ play xs game
     Right r -> return r
 
-getAction :: ActionName -> GameState s -> Either GameError (Action s)
-getAction txt game = mte InvalidAction $ Map.lookup txt (game ^. actions)
-
-mkGame :: 
-  ActionSet s
-  -> s
-  -> (s -> Bool)
-  -> (s -> r)
-  -> Game s r
-mkGame initAcns initSt cond res = Game (GameState initAcns initSt) cond res
+getAction :: ActionName -> Game s r -> Either GameError (Action s)
+getAction name game = mte InvalidAction $ Map.lookup name (game ^. actions)

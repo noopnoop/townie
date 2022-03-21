@@ -1,4 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+-- GamerCombinators.hs
+-- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
+-- Ways of combining Games to make new Games
 module GamerCombinators where
 import           Control.Lens                   ( (&) )
 import           Control.Lens.Operators         ( (%~)
@@ -9,36 +12,11 @@ import           Data.Bifunctor                 ( Bifunctor(bimap) )
 import           Data.Either                    ( isLeft )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
--- GamerCombinators.hs
--- GameCombinators would make more sense but still be too verbose. i really just wanted to call something gamer combinators
--- Ways of combining Games to make new Games
+
 import           Types                          ( Action(Action)
                                                 , ActionSet
                                                 , Game(Game)
-                                                , GameState(GameState)
                                                 , actions
-                                                , gameState
                                                 )
 
 
@@ -63,6 +41,9 @@ import           Types                          ( Action(Action)
 -- mkLeftAction :: Action s -> Action (Either s t)
 -- mkLeftAction (Action usbl acn) = Action usbl' acn'
 --  where
---   usbl' = \st -> case st ^. gameState of
+--   usbl' = \st -> case st of
 --     Right _ -> False
 --     Left  s -> usbl s
+--   acn' = \st -> case st^.gameState of
+--     Right _ -> id
+--     Left s -> GameState ()
