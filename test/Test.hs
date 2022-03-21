@@ -6,9 +6,6 @@ import           Control.Lens                   ( (%~)
 import           Control.Monad.State            ( execState )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
-import           SimpleGame                     ( SimpleGame
-                                                , mkSimpleGame
-                                                )
 import           Test.HUnit                     ( Test
                                                   ( TestCase
                                                   , TestLabel
@@ -28,7 +25,7 @@ import           Types                          ( Action(Action)
                                                 , gameState
                                                 , getAction
                                                 , initial
-                                                , play
+                                                , play, mkGame
                                                 )
 import           Voting                         ( mkVoting )
 
@@ -39,7 +36,7 @@ testSimpleGameOnInputs
   => Description
   -> Either GameError r
   -> [Text]
-  -> SimpleGame s r
+  -> Game s r
   -> Test
 testSimpleGameOnInputs desc expected inputs game =
   TestCase $ assertEqual desc expected $ play inputs game
@@ -52,7 +49,7 @@ flipIt :: Action Bool
 flipIt = Action (const True) $ gameState %~ not
 
 flipTheSwitch :: Game Bool Bool
-flipTheSwitch = mkSimpleGame (Map.singleton "flip" flipIt) False (== True) id
+flipTheSwitch = mkGame (Map.singleton "flip" flipIt) False (== True) id
 
 testPlay :: Test
 testPlay = testSimpleGameOnInputs "for flipTheSwitch,"

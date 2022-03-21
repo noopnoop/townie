@@ -27,7 +27,6 @@ library
   exposed-modules:
       GamerCombinators
       Lib
-      SimpleGame
       Types
       Util
       Voting

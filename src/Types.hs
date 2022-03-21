@@ -14,7 +14,7 @@ import           Control.Monad.State            ( State
                                                 , evalStateT
                                                 , get
                                                 , gets
-                                                , modify
+                                                , modify, MonadState (put)
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -38,8 +38,8 @@ type Players p = Map PlayerName p
 
 data Game s r = Game
   { _initial :: GameState s
-  , _isOver  :: GameState s -> Bool
-  , _onWin   :: GameState s -> r
+  , _isOver  :: s -> Bool
+  , _onWin   :: s -> r
   }
   deriving Generic
 
@@ -50,7 +50,7 @@ data GameState s = GameState
   deriving Generic
 
 data Action s = Action
-  { useable :: GameState s -> Bool
+  { useable :: s -> Bool
   , action  :: GameState s -> GameState s
   }
 
@@ -62,12 +62,12 @@ $(makeLenses ''Game)
 
 act :: Monad m => Action s -> StateT (GameState s) m ()
 act (Action usbl acn) = do
-  ok <- gets usbl
+  ok <- gets $ usbl . _gameState
   when ok $ modify acn
 
 tryToEnd :: Game s r -> GameState s -> Either GameError r
 tryToEnd game st =
-  if game ^. isOver $ st then return $ game ^. onWin $ st else Left InProgress
+  if game ^. isOver $ st^.gameState then return $ game ^. onWin $ st^.gameState else Left InProgress
 
 play :: [ActionName] -> Game s r -> Either GameError r
 play []       game = tryToEnd game $ game ^. initial
@@ -82,3 +82,11 @@ play (x : xs) game = flip evalStateT (game ^. initial) $ do
 
 getAction :: ActionName -> GameState s -> Either GameError (Action s)
 getAction txt game = mte InvalidAction $ Map.lookup txt (game ^. actions)
+
+mkGame :: 
+  ActionSet s
+  -> s
+  -> (s -> Bool)
+  -> (s -> r)
+  -> Game s r
+mkGame initAcns initSt cond res = Game (GameState initAcns initSt) cond res

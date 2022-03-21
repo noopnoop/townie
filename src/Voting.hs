@@ -17,7 +17,6 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 import           GHC.Float                      ( int2Float )
 import           GHC.Generics                   ( Generic )
-import           SimpleGame                     ( mkSimpleGame )
 import           Types                          ( Action(Action)
                                                 , ActionName
                                                 , ActionSet
@@ -27,7 +26,7 @@ import           Types                          ( Action(Action)
                                                 , PlayerName
                                                 , Players
                                                 , alive
-                                                , gameState
+                                                , gameState, mkGame
                                                 )
 import           Util                           ( tally )
 
@@ -91,4 +90,4 @@ doWin st = case majority st of
   _                   -> Nothing
 
 mkVoting :: Players p -> Game (VotingState p) (Maybe PlayerName)
-mkVoting ps = mkSimpleGame (mkActions ps) (mkInitial ps) overWhen doWin
+mkVoting ps = mkGame (mkActions ps) (mkInitial ps) overWhen doWin
