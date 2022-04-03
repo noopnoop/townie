@@ -19,14 +19,8 @@ count x (h : t) = if x /= h then count x t else 1 + count x t
 tally :: Eq a => [a] -> [(a, Int)]
 tally xs = reverse $ sortWith snd $ nub $ map (\x -> (x, count x xs)) xs
 
-(|||) :: Either e a -> Either e a -> Either e a
-(|||) (Right a) _         = Right a
-(|||) (Left  e) a = a
-
 mapIndicesToSet :: Ord k => Map k a -> Set k
 mapIndicesToSet = Set.fromList . fmap fst . Map.toList
-
-infixl 3 |||
 
 -- please don't make me write this
 -- they made me write this

@@ -9,40 +9,36 @@ import           Control.Lens                   ( use )
 import           Control.Lens.Operators         ( (%~)
                                                 , (&)
                                                 , (.=)
-                                                , (.~)
                                                 , (^.)
                                                 )
 import           Control.Lens.TH                ( makeClassy )
-import           Control.Monad.Except           ( MonadError(catchError) )
-import           Control.Monad.State            ( MonadState(get, put)
-                                                , gets
+import           Control.Monad.State            ( gets
                                                 , modify
                                                 )
 import qualified Data.Map                      as Map
+import           Data.Map                       ( Map )
 import           Data.Text                      ( Text )
-import           Debug.Trace                    ( traceShowM )
 import           GHC.Generics                   ( Generic )
-import           Types                          ( Game
-                                                , InProgress(InProgress)
-                                                , PlayerName
-                                                , Players
-                                                )
+import           Types                          ( Game )
 import           Voting                         ( HasVotingState(..)
                                                 , Vote(..)
                                                 , VoteResult(..)
                                                 , VotingState(..)
                                                 , mkVotingState
                                                 , vote
-                                                , voting
                                                 )
 
 newtype Player = Player { team :: Team } deriving (Show, Eq)
-data Team = Town | Mafia deriving (Show, Eq)
+type PlayerName = Text
+type Players = Map PlayerName Player
+data Team = Town | Mafia deriving (Show, Eq, Enum)
+data Phase = Night | Day deriving (Show, Eq, Enum)
 type Input = (PlayerName, Vote PlayerName)
 
 data MafiaState = MafiaState
   { _mafiaVotingState :: VotingState PlayerName PlayerName
-  , _players     :: Players PlayerName
+  , _players          :: Players
+  , _phase            :: Phase
   }
   deriving (Generic, Show)
 
@@ -51,63 +47,102 @@ $(makeClassy ''MafiaState)
 instance HasVotingState MafiaState PlayerName PlayerName where
   votingState = mafiaVotingState
 
--- teamMembers :: Team -> MafiaState -> Players PlayerName
--- teamMembers t st = Map.filter ((==) t . team) $ st ^. players
+teamMembers :: (HasMafiaState s) => Team -> s -> Players
+teamMembers t st = Map.filter ((==) t . team) $ st ^. players
 
--- townMembers :: MafiaState -> Players PlayerName
--- townMembers = teamMembers Town
+townMembers :: (HasMafiaState s) => s -> Players
+townMembers = teamMembers Town
 
--- mafiaMembers :: MafiaState -> Players PlayerName
--- mafiaMembers = teamMembers Mafia
+mafiaMembers :: (HasMafiaState s) => s -> Players
+mafiaMembers = teamMembers Mafia
+
+mafiaWin :: (HasMafiaState s) => s -> Bool
+mafiaWin st = Map.size (mafiaMembers st) >= Map.size (townMembers st)
+
+townWin :: (HasMafiaState s) => s -> Bool
+townWin st = Map.size (mafiaMembers st) == 0
+
+nooneWin :: (HasMafiaState s) => s -> Bool
+nooneWin st = mafiaWin st && townWin st
 
 handleKill
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
-  => Game s (VoteResult PlayerName)
+  => Game s Players
   -> VoteResult PlayerName
-  -> Game s (VoteResult PlayerName)
+  -> Game s Players
 handleKill next plr = do
   modify $ kill plr
-  done <- gets isOver
-  if done then gets (Just . handleWin) else next
+  checkWin <- gets handleWin
+  case checkWin of
+    Nothing     -> next
+    Just winner -> return $ Just winner
 
 kill :: (Show s, HasMafiaState s) => VoteResult PlayerName -> s -> s
 kill target st = case target of
   Passed    -> st
   Voted plr -> st & players %~ Map.delete plr
 
-isOver :: (HasMafiaState s) => s -> Bool
-isOver st = (==) Map.empty $ st ^. players
+handleWin :: (HasMafiaState s) => s -> Maybe Players
+handleWin st | nooneWin st = Just Map.empty
+             | mafiaWin st = Just $ mafiaMembers st
+             | townWin st  = Just $ townMembers st
+             | otherwise   = Nothing
 
-handleWin :: (HasMafiaState s) => s -> VoteResult PlayerName
-handleWin = const Passed
+dayPhase
+  :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
+  => Input
+  -> Game s Players
+dayPhase input = do
+  checkVoting <- vote input
+  case checkVoting of
+    Nothing     -> return Nothing
+    Just result -> handleKill (changePhase Night >> mkMafiaVote) result
 
 basicMafia
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => Input
-  -> Game s (VoteResult PlayerName)
+  -> Game s Players
 basicMafia input = do
+  time <- use phase
+  case time of
+    Night -> nightPhase input
+    Day   -> dayPhase input
+
+nightPhase
+  :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
+  => Input
+  -> Game s Players
+nightPhase input = do
   checkVoting <- vote input
   case checkVoting of
     Nothing     -> return Nothing
-    Just result -> handleKill resetVotes result
+    Just result -> handleKill (changePhase Day >> mkTownVote) result
 
--- basicMafia :: [(PlayerName, Vote PlayerName)] -> Game MafiaState (Players Player)
--- basicMafia inputs = do
---   voted <- dayPhase inputs
---   st    <- get
---   traceShowM st
---   case voted of
---     Nothing   -> return Nothing
---     Just vote -> handleKill basicMafia vote
+changePhase :: (HasMafiaState s) => Phase -> Game s ()
+changePhase p = phase .= p >> return Nothing
 
--- nightPhase :: Game MafiaState (Maybe PlayerName)
--- nightPhase = do
---   mafia <- gets mafiaMembers
---   votingState .= mkVotingState $ toList mafia
---   voting
-
-resetVotes :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s) => Game s (VoteResult PlayerName)
-resetVotes = do
-  plrs <- Map.keys <$> use players
-  votingState .= mkVotingState plrs
+mkVote
+  :: (Show s, HasVotingState s PlayerName r, HasMafiaState s)
+  => Players
+  -> Game s Players
+mkVote plrs = do
+  votingState .= mkVotingState (Map.keys plrs)
   return Nothing
+
+mkMafiaVote
+  :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s Players
+mkMafiaVote = do
+  plrs <- gets mafiaMembers
+  mkVote plrs
+
+mkTownVote
+  :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s Players
+mkTownVote = do
+  plrs <- use players
+  mkVote plrs
+
+nightStart :: Players -> MafiaState
+nightStart plrs = MafiaState mafVote plrs Night
+ where
+  mafVote = mkVotingState mafias
+  mafias  = Map.keys $ Map.filter ((==) Mafia . team) plrs
