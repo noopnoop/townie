@@ -43,11 +43,15 @@ votePure :: (Ord p, HasVotingState s p r) => p -> Vote r -> s -> s
 votePure player ballot st = st & votes %~ Map.adjust (const ballot) player
 
 votingFinished :: (Eq r, HasVotingState s p r) => s -> Maybe (VoteResult r)
-votingFinished st = case majority of
-  NoVote -> Nothing
-  Pass   -> Just Passed
-  For r  -> Just $ Voted r
-  where majority = fst $ head $ tally $ Map.elems $ st ^. votes
+votingFinished st = if majVotes > (numPlayers `div` 2)
+  then case majority of
+    NoVote -> Nothing
+    Pass   -> Just Passed
+    For r  -> Just $ Voted r
+  else Nothing
+ where
+  (majority, majVotes) = head $ tally $ Map.elems $ st ^. votes
+  numPlayers           = Map.size $ st ^. votes
 
 vote
   :: (Show s, Ord p, Eq r, HasVotingState s p r)

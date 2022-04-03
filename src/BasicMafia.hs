@@ -132,8 +132,8 @@ mkVote plrs = do
 mkMafiaVote
   :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s Players
 mkMafiaVote = do
-  plrs <- gets mafiaMembers
-  mkVote plrs
+  mafias <- gets mafiaMembers
+  mkVote mafias
 
 mkTownVote
   :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s Players

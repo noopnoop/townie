@@ -13,6 +13,7 @@ import           Test.HUnit                     ( Test
                                                 , runTestTT
                                                 )
 import           Types                          ( Game
+                                                , foldGame
                                                 , foldGameDebug
                                                 , play
                                                 )
@@ -34,9 +35,9 @@ testGame desc cond init game =
   Tests for the voting game
 -}
 votingPlayers :: [Text]
-votingPlayers = ["p1", "p2"]
+votingPlayers = ["p1", "p2", "p3"]
 votingInit = mkVotingState votingPlayers
-votes = [("p1", For "p1"), ("p2", For "p2")]
+votes = [("p1", For "p2"), ("p3", For "p2")]
 
 testVotingEmpty :: Test
 testVotingEmpty = testGame "for voting game with no input,"
@@ -55,21 +56,62 @@ testVoting = testGame "for voting game,"
 -}
 
 mafiaPlayers :: Players
-mafiaPlayers = Map.fromList [("p1", Player Mafia), ("p2", Player Town)]
-mafiaVotes :: [(PlayerName, Vote PlayerName)]
-mafiaVotes = [("p1", For "p1")]
+mafiaPlayers = Map.fromList
+  [ ("maf", Player Mafia)
+  , ("t1" , Player Town)
+  , ("t2" , Player Town)
+  , ("t3" , Player Town)
+  , ("t4" , Player Town)
+  ]
+simpleTownWinVotes :: [(PlayerName, Vote PlayerName)]
+simpleTownWinVotes = [("maf", For "maf")]
 
-testMafia :: Test
-testMafia = testGame "for basic mafia,"
-                     ((==) $ Just $ Map.singleton "p1" $ Player Mafia)
-                     (nightStart mafiaPlayers)
-                     (foldGameDebug basicMafia mafiaVotes)
+townWinVotes :: [(PlayerName, Vote PlayerName)]
+townWinVotes =
+  [("maf", For "t4"), ("t1", For "maf"), ("t2", For "maf"), ("t3", For "maf")]
+
+mafiaWinVotes :: [(PlayerName, Vote PlayerName)]
+mafiaWinVotes =
+  [ ("maf", For "t4")
+  , ("maf", For "t3")
+  , ("t1" , For "t3")
+  , ("t2" , For "t3")
+  , ("maf", For "t3")
+  ]
+
+testEmptyMafia :: Test
+testEmptyMafia = testGame "for basic mafia (no inputs),"
+                          isNothing
+                          (nightStart mafiaPlayers)
+                          (foldGame basicMafia [])
+
+testSimpleTownWin :: Test
+testSimpleTownWin = testGame "for basic mafia (simple town victory),"
+                             ((==) $ Just $ Map.delete "maf" mafiaPlayers)
+                             (nightStart mafiaPlayers)
+                             (foldGame basicMafia simpleTownWinVotes)
+
+testTownWin :: Test
+testTownWin = testGame "for basic mafia (more complex town win),"
+                       ((==) $ Just $ Map.delete "maf" mafiaPlayers)
+                       (nightStart mafiaPlayers)
+                       (foldGame basicMafia townWinVotes)
+
+testMafiaWin :: Test
+testMafiaWin = testGame "for basic mafia (mafia win),"
+                        ((==) $ Just $ Map.singleton "maf" (Player Mafia))
+                        (nightStart mafiaPlayers)
+                        (foldGameDebug basicMafia mafiaWinVotes)
+
 
 tests :: Test
 tests = TestList
-  [ TestLabel "test voting"              testVoting
-  , TestLabel "test voting (empty case)" testVotingEmpty
-  , TestLabel "test basic mafia"         testMafia
+  [ TestLabel "test voting"      testVoting
+  , TestLabel "test voting"      testVotingEmpty
+  , TestLabel "test basic mafia" testEmptyMafia
+  , TestLabel "test basic mafia" testSimpleTownWin
+  , TestLabel "test basic mafia" testTownWin
+  , TestLabel "test basic mafia" testMafiaWin
   ]
 
 main :: IO ()
