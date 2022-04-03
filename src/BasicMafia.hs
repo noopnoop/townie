@@ -27,12 +27,14 @@ import           Voting                         ( HasVotingState(..)
                                                 , mkVotingState
                                                 , vote
                                                 )
+import Debug.Trace (traceShowM)
 
-newtype Player = Player { team :: Team } deriving (Show, Eq)
+data Player = Player { team :: Team, alive :: Bool } deriving (Show, Eq)
 type PlayerName = Text
 type Players = Map PlayerName Player
 data Team = Town | Mafia deriving (Show, Eq, Enum)
 data Phase = Night | Day deriving (Show, Eq, Enum)
+data MafiaResult = Draw | TeamWin Team deriving (Show, Eq)
 type Input = (PlayerName, Vote PlayerName)
 
 data MafiaState = MafiaState
@@ -65,11 +67,20 @@ townWin st = Map.size (mafiaMembers st) == 0
 nooneWin :: (HasMafiaState s) => s -> Bool
 nooneWin st = mafiaWin st && townWin st
 
+checkAlive :: (HasMafiaState s) => PlayerName -> s -> Bool
+checkAlive plr st = maybe False alive $ Map.lookup plr (st ^. players)
+
+validVote :: (HasMafiaState s) => Input -> s -> Bool
+validVote (voter, theirVote) st = case theirVote of
+  NoVote -> checkAlive voter st
+  Pass -> checkAlive voter st
+  For votee -> checkAlive voter st && checkAlive votee st
+
 handleKill
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
-  => Game s Players
+  => Game s MafiaResult
   -> VoteResult PlayerName
-  -> Game s Players
+  -> Game s MafiaResult
 handleKill next plr = do
   modify $ kill plr
   checkWin <- gets handleWin
@@ -82,26 +93,37 @@ kill target st = case target of
   Passed    -> st
   Voted plr -> st & players %~ Map.delete plr
 
-handleWin :: (HasMafiaState s) => s -> Maybe Players
-handleWin st | nooneWin st = Just Map.empty
-             | mafiaWin st = Just $ mafiaMembers st
-             | townWin st  = Just $ townMembers st
+handleWin :: (HasMafiaState s) => s -> Maybe MafiaResult
+handleWin st | nooneWin st = Just Draw
+             | mafiaWin st = Just $ TeamWin Mafia
+             | townWin st  = Just $ TeamWin Town
              | otherwise   = Nothing
 
 dayPhase
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => Input
-  -> Game s Players
-dayPhase input = do
-  checkVoting <- vote input
-  case checkVoting of
-    Nothing     -> return Nothing
-    Just result -> handleKill (changePhase Night >> mkMafiaVote) result
+  -> Game s MafiaResult
+dayPhase = handleVote $ changePhase Night >> mkMafiaVote
+
+handleVote
+  :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
+  => Game s MafiaResult
+  -> Input
+  -> Game s MafiaResult
+handleVote next input = do
+  checkValid <- gets $ validVote input
+  if not checkValid
+    then return Nothing
+    else do
+      checkVoting <- vote input
+      case checkVoting of
+        Nothing -> return Nothing
+        Just result -> handleKill next result
 
 basicMafia
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => Input
-  -> Game s Players
+  -> Game s MafiaResult
 basicMafia input = do
   time <- use phase
   case time of
@@ -111,12 +133,8 @@ basicMafia input = do
 nightPhase
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => Input
-  -> Game s Players
-nightPhase input = do
-  checkVoting <- vote input
-  case checkVoting of
-    Nothing     -> return Nothing
-    Just result -> handleKill (changePhase Day >> mkTownVote) result
+  -> Game s MafiaResult
+nightPhase = handleVote $ changePhase Day >> mkTownVote
 
 changePhase :: (HasMafiaState s) => Phase -> Game s ()
 changePhase p = phase .= p >> return Nothing
@@ -124,19 +142,19 @@ changePhase p = phase .= p >> return Nothing
 mkVote
   :: (Show s, HasVotingState s PlayerName r, HasMafiaState s)
   => Players
-  -> Game s Players
+  -> Game s MafiaResult
 mkVote plrs = do
   votingState .= mkVotingState (Map.keys plrs)
   return Nothing
 
 mkMafiaVote
-  :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s Players
+  :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s MafiaResult
 mkMafiaVote = do
   mafias <- gets mafiaMembers
   mkVote mafias
 
 mkTownVote
-  :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s Players
+  :: (Show s, HasVotingState s PlayerName r, HasMafiaState s) => Game s MafiaResult
 mkTownVote = do
   plrs <- use players
   mkVote plrs

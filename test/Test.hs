@@ -28,7 +28,7 @@ type Description = String
 testGame
   :: (Show r, Eq r) => Description -> (Maybe r -> Bool) -> s -> Game s r -> Test
 testGame desc cond init game =
-  TestCase $ assertBool (desc <> ", got " <> show output) $ cond output
+  TestCase $ assertBool (desc <> " got " <> show output) $ cond output
   where output = play init game
 
 {-
@@ -57,11 +57,11 @@ testVoting = testGame "for voting game,"
 
 mafiaPlayers :: Players
 mafiaPlayers = Map.fromList
-  [ ("maf", Player Mafia)
-  , ("t1" , Player Town)
-  , ("t2" , Player Town)
-  , ("t3" , Player Town)
-  , ("t4" , Player Town)
+  [ ("maf", Player Mafia True)
+  , ("t1" , Player Town True)
+  , ("t2" , Player Town True)
+  , ("t3" , Player Town True)
+  , ("t4" , Player Town True)
   ]
 simpleTownWinVotes :: [(PlayerName, Vote PlayerName)]
 simpleTownWinVotes = [("maf", For "maf")]
@@ -76,7 +76,17 @@ mafiaWinVotes =
   , ("maf", For "t3")
   , ("t1" , For "t3")
   , ("t2" , For "t3")
+  , ("maf", For "t2")
+  ]
+
+validateVoteVotes :: [(PlayerName, Vote PlayerName)]
+validateVoteVotes = 
+  [ ("maf", For "t4")
   , ("maf", For "t3")
+  , ("t1" , For "t3")
+  , ("t2" , For "t3")
+  , ("maf", For "t3")
+  , ("maf", For "t4")
   ]
 
 testEmptyMafia :: Test
@@ -87,22 +97,27 @@ testEmptyMafia = testGame "for basic mafia (no inputs),"
 
 testSimpleTownWin :: Test
 testSimpleTownWin = testGame "for basic mafia (simple town victory),"
-                             ((==) $ Just $ Map.delete "maf" mafiaPlayers)
+                             ((==) $ Just $ TeamWin Town)
                              (nightStart mafiaPlayers)
                              (foldGame basicMafia simpleTownWinVotes)
 
 testTownWin :: Test
 testTownWin = testGame "for basic mafia (more complex town win),"
-                       ((==) $ Just $ Map.delete "maf" mafiaPlayers)
+                       ((==) $ Just $ TeamWin Town)
                        (nightStart mafiaPlayers)
                        (foldGame basicMafia townWinVotes)
 
 testMafiaWin :: Test
 testMafiaWin = testGame "for basic mafia (mafia win),"
-                        ((==) $ Just $ Map.singleton "maf" (Player Mafia))
+                        ((==) $ Just $ TeamWin Mafia)
                         (nightStart mafiaPlayers)
-                        (foldGameDebug basicMafia mafiaWinVotes)
+                        (foldGame basicMafia mafiaWinVotes)
 
+testValidateVotes :: Test
+testValidateVotes= testGame "for basic mafia (validating votes),"
+                        isNothing
+                        (nightStart mafiaPlayers)
+                        (foldGame basicMafia validateVoteVotes)
 
 tests :: Test
 tests = TestList
@@ -112,6 +127,7 @@ tests = TestList
   , TestLabel "test basic mafia" testSimpleTownWin
   , TestLabel "test basic mafia" testTownWin
   , TestLabel "test basic mafia" testMafiaWin
+  , TestLabel "test basic mafia" testValidateVotes
   ]
 
 main :: IO ()
