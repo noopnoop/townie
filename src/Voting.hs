@@ -4,11 +4,18 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections          #-}
 -- Voting.hs
 -- Logic for the "voting" subgame that makes up the heart of mafia
--- Could make this even more general (voting for arbitrary things instead of always for other players)
-module Voting where
+module Voting
+  ( Vote(..)
+  , VoteResult(..)
+  , VotingState
+  , mkVotingState
+  , vote
+  , HasVotingState(..)
+  , voting
+  ) where
 import           Control.Lens                   ( (^.)
                                                 , makeClassy
                                                 )
@@ -20,6 +27,8 @@ import           Control.Monad.State            ( gets
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.Set                       ( Set )
+import qualified Data.Set                      as Set
 import           GHC.Generics                   ( Generic )
 import           Types                          ( Game
                                                 , foldGame
@@ -32,15 +41,25 @@ data Vote r = NoVote
 
 data VoteResult r = Passed | Voted r deriving (Eq,Show)
 
-newtype VotingState p r = VotingState { _votes :: Map p (Vote r) } deriving (Generic, Show)
+data VotingState p r = VotingState
+  { _votes      :: Map p (Vote r)
+  , _candidates :: Set r
+  }
+  deriving (Generic, Show)
 
 $(makeClassy ''VotingState)
 
-mkVotingState :: (Ord p) => [p] -> VotingState p r
-mkVotingState = VotingState . Map.fromList . map (, NoVote)
+mkVotingState :: (Ord p, Ord r) => [p] -> [r] -> VotingState p r
+mkVotingState plrs choices =
+  VotingState (Map.fromList $ map (, NoVote) plrs) (Set.fromList choices)
 
-votePure :: (Ord p, HasVotingState s p r) => p -> Vote r -> s -> s
-votePure player ballot st = st & votes %~ Map.adjust (const ballot) player
+votePure :: (Ord p, Ord r, HasVotingState s p r) => p -> Vote r -> s -> s
+votePure player ballot st = st & votes %~ Map.adjust newVote player
+ where
+  newVote = case ballot of
+    NoVote -> const NoVote
+    Pass   -> const Pass
+    For r  -> if Set.member r (st ^. candidates) then const $ For r else id
 
 votingFinished :: (Eq r, HasVotingState s p r) => s -> Maybe (VoteResult r)
 votingFinished st = if majVotes > (numPlayers `div` 2)
@@ -54,7 +73,7 @@ votingFinished st = if majVotes > (numPlayers `div` 2)
   numPlayers           = Map.size $ st ^. votes
 
 vote
-  :: (Show s, Ord p, Eq r, HasVotingState s p r)
+  :: (Show s, Ord p, Ord r, HasVotingState s p r)
   => (p, Vote r)
   -> Game s (VoteResult r)
 vote (player, ballot) = do
@@ -62,7 +81,7 @@ vote (player, ballot) = do
   gets votingFinished
 
 voting
-  :: (Ord p, Eq r, Show s, HasVotingState s p r)
+  :: (Ord p, Ord r, Show s, HasVotingState s p r)
   => [(p, Vote r)]
   -> Game s (VoteResult r)
 voting = foldGame vote

@@ -36,7 +36,7 @@ testGame desc cond init game =
 -}
 votingPlayers :: [Text]
 votingPlayers = ["p1", "p2", "p3"]
-votingInit = mkVotingState votingPlayers
+votingInit = mkVotingState votingPlayers votingPlayers
 votes = [("p1", For "p2"), ("p3", For "p2")]
 
 testVotingEmpty :: Test
@@ -80,7 +80,7 @@ mafiaWinVotes =
   ]
 
 validateVoteVotes :: [(PlayerName, Vote PlayerName)]
-validateVoteVotes = 
+validateVoteVotes =
   [ ("maf", For "t4")
   , ("maf", For "t3")
   , ("t1" , For "t3")
@@ -114,10 +114,10 @@ testMafiaWin = testGame "for basic mafia (mafia win),"
                         (foldGame basicMafia mafiaWinVotes)
 
 testValidateVotes :: Test
-testValidateVotes= testGame "for basic mafia (validating votes),"
-                        isNothing
-                        (nightStart mafiaPlayers)
-                        (foldGame basicMafia validateVoteVotes)
+testValidateVotes = testGame "for basic mafia (validating votes),"
+                             isNothing
+                             (nightStart mafiaPlayers)
+                             (foldGame basicMafia validateVoteVotes)
 
 tests :: Test
 tests = TestList
