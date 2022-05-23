@@ -1,5 +1,4 @@
-module Main where
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-
-main :: IO ()
-main = putStrLn "howdy"
+main = putStrLn "sAdafafa"

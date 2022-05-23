@@ -30,8 +30,10 @@ import qualified Data.Map                      as Map
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           GHC.Generics                   ( Generic )
-import           Types                          ( Game
-                                                , foldGame
+import           Game                           ( Game
+                                                , HasElement(..)
+                                                , InputHandler
+                                                , play
                                                 )
 import           Util                           ( tally )
 
@@ -39,7 +41,10 @@ data Vote r = NoVote
           | Pass
           | For r deriving (Eq, Show)
 
-data VoteResult r = Passed | Voted r deriving (Eq,Show)
+data VoteResult r = Passed | Voted r | VoteInProgress deriving (Eq,Show)
+
+instance HasElement (VoteResult r) where
+  defaultElement = VoteInProgress
 
 data VotingState p r = VotingState
   { _votes      :: Map p (Vote r)
@@ -61,27 +66,27 @@ votePure player ballot st = st & votes %~ Map.adjust newVote player
     Pass   -> const Pass
     For r  -> if Set.member r (st ^. candidates) then const $ For r else id
 
-votingFinished :: (Eq r, HasVotingState s p r) => s -> Maybe (VoteResult r)
+votingFinished :: (Eq r, HasVotingState s p r) => s -> VoteResult r
 votingFinished st = if majVotes > (numPlayers `div` 2)
   then case majority of
-    NoVote -> Nothing
-    Pass   -> Just Passed
-    For r  -> Just $ Voted r
-  else Nothing
+    NoVote -> VoteInProgress
+    Pass   -> Passed
+    For r  -> Voted r
+  else VoteInProgress
  where
   (majority, majVotes) = head $ tally $ Map.elems $ st ^. votes
   numPlayers           = Map.size $ st ^. votes
 
 vote
   :: (Show s, Ord p, Ord r, HasVotingState s p r)
-  => (p, Vote r)
-  -> Game s (VoteResult r)
+  => InputHandler (p, Vote r) s (VoteResult r)
 vote (player, ballot) = do
   modify $ votePure player ballot
   gets votingFinished
 
 voting
   :: (Ord p, Ord r, Show s, HasVotingState s p r)
-  => [(p, Vote r)]
-  -> Game s (VoteResult r)
-voting = foldGame vote
+  => s
+  -> [(p, Vote r)]
+  -> VoteResult r
+voting st = play st vote

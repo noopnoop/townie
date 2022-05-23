@@ -19,7 +19,10 @@ import qualified Data.Map                      as Map
 import           Data.Map                       ( Map )
 import           Data.Text                      ( Text )
 import           GHC.Generics                   ( Generic )
-import           Types                          ( Game )
+import           Game                           ( Game
+                                                , HasElement(..)
+                                                , InputHandler
+                                                )
 import           Voting                         ( HasVotingState(..)
                                                 , Vote(..)
                                                 , VoteResult(..)
@@ -37,8 +40,11 @@ type PlayerName = Text
 type Players = Map PlayerName Player
 data Team = Town | Mafia deriving (Show, Eq, Enum)
 data Phase = Night | Day deriving (Show, Eq, Enum)
-data MafiaResult = Draw | TeamWin Team deriving (Show, Eq)
-type Input = (PlayerName, Vote PlayerName)
+data MafiaResult = Draw | TeamWin Team | MafiaInProgress deriving (Show, Eq)
+type MafiaInput = (PlayerName, Vote PlayerName)
+
+instance HasElement MafiaResult where
+  defaultElement = MafiaInProgress :: MafiaResult
 
 data MafiaState = MafiaState
   { _mafiaVotingState :: VotingState PlayerName PlayerName
@@ -74,7 +80,7 @@ nooneWin st = mafiaWin st && townWin st
 checkAlive :: (HasMafiaState s) => PlayerName -> s -> Bool
 checkAlive plr st = maybe False alive $ Map.lookup plr (st ^. players)
 
-validVote :: (HasMafiaState s) => Input -> s -> Bool
+validVote :: (HasMafiaState s) => MafiaInput -> s -> Bool
 validVote (voter, theirVote) st = case theirVote of
   NoVote    -> checkAlive voter st
   Pass      -> checkAlive voter st
@@ -90,7 +96,7 @@ handleKill next plr = do
   checkWin <- gets handleWin
   case checkWin of
     Nothing     -> next
-    Just winner -> return $ Just winner
+    Just winner -> return winner
 
 kill :: (Show s, HasMafiaState s) => VoteResult PlayerName -> s -> s
 kill target st = case target of
@@ -105,29 +111,26 @@ handleWin st | nooneWin st = Just Draw
 
 dayPhase
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
-  => Input
-  -> Game s MafiaResult
+  => InputHandler MafiaInput s MafiaResult
 dayPhase = handleVote $ changePhase Night >> mkMafiaVote
 
 handleVote
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => Game s MafiaResult
-  -> Input
-  -> Game s MafiaResult
+  -> InputHandler MafiaInput s MafiaResult
 handleVote next input = do
   checkValid <- gets $ validVote input
   if not checkValid
-    then return Nothing
+    then return MafiaInProgress
     else do
       checkVoting <- vote input
       case checkVoting of
-        Nothing     -> return Nothing
-        Just result -> handleKill next result
+        VoteInProgress -> return MafiaInProgress
+        result         -> handleKill next result
 
 basicMafia
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
-  => Input
-  -> Game s MafiaResult
+  => InputHandler MafiaInput s MafiaResult
 basicMafia input = do
   time <- use phase
   case time of
@@ -136,12 +139,11 @@ basicMafia input = do
 
 nightPhase
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
-  => Input
-  -> Game s MafiaResult
+  => InputHandler MafiaInput s MafiaResult
 nightPhase = handleVote $ changePhase Day >> mkTownVote
 
 changePhase :: (HasMafiaState s) => Phase -> Game s ()
-changePhase p = phase .= p >> return Nothing
+changePhase p = phase .= p
 
 mkMafiaVote
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
@@ -150,7 +152,7 @@ mkMafiaVote = do
   mafias <- Map.keys . mafiaMembers <$> use players
   plrs   <- Map.keys <$> use players
   votingState .= mkVotingState mafias plrs
-  return Nothing
+  return MafiaInProgress
 
 mkTownVote
   :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
@@ -158,7 +160,7 @@ mkTownVote
 mkTownVote = do
   plrs <- Map.keys <$> use players
   votingState .= mkVotingState plrs plrs
-  return Nothing
+  return MafiaInProgress
 
 nightStart :: Players -> MafiaState
 nightStart plrs = MafiaState mafVote plrs Night
