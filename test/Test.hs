@@ -44,6 +44,18 @@ testGame desc cond init handler inputs =
   TestCase $ assertBool (desc <> " got " <> show output) $ cond output
   where output = play init handler inputs
 
+testGameDebug
+  :: (Show s, Show r, Eq r, Traversable t, HasElement r)
+  => Description
+  -> (r -> Bool)
+  -> s
+  -> InputHandler a s r
+  -> t a
+  -> Test
+testGameDebug desc cond init handler inputs =
+  TestCase $ assertBool (desc <> " got " <> show output) $ cond output
+  where output = playDebug init handler inputs
+
 {-
   Tests for the voting game
 -}

@@ -47,8 +47,8 @@ play initial fn inputs =
 
 -- | The same as 'play', but traces the internal state before accepting each input in the traversable.
 playDebug
-  :: (Traversable t, Show s, HasElement r) => (a -> Game s r) -> t a -> Game s r
-playDebug fn = foldM fn' defaultElement
+  :: (Traversable t, Show s, HasElement r) => s-> (a -> Game s r) -> t a -> r
+playDebug initial fn inputs = evalState (foldM fn' defaultElement inputs) initial
  where
   fn' _ = \a -> do
     st <- get
