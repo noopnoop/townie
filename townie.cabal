@@ -27,6 +27,7 @@ library
   exposed-modules:
       BasicMafia
       Game
+      Json
       Util
       Voting
   other-modules:
@@ -35,7 +36,9 @@ library
       src
   build-depends:
       HUnit
+    , aeson
     , base >=4.7 && <5
+    , bytestring
     , containers
     , lens
     , mtl
@@ -51,7 +54,9 @@ executable townie-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HUnit
+    , aeson
     , base >=4.7 && <5
+    , bytestring
     , containers
     , lens
     , mtl
@@ -69,7 +74,9 @@ test-suite townie-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HUnit
+    , aeson
     , base >=4.7 && <5
+    , bytestring
     , containers
     , lens
     , mtl

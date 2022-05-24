@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Main where
 import           BasicMafia
+import qualified Data.ByteString.Lazy          as BS
 import qualified Data.Map                      as Map
 import           Data.Maybe                     ( isNothing )
 import           Data.Text                      ( Text )
@@ -11,7 +12,9 @@ import           Game                           ( Game
                                                 , play
                                                 , playDebug
                                                 )
-import           Test.HUnit                     ( Test
+import           Json                           ( parseData )
+import           Test.HUnit                     ( Assertable(assert)
+                                                , Test
                                                   ( TestCase
                                                   , TestLabel
                                                   , TestList
@@ -119,6 +122,14 @@ testValidateVotes = testGame
   , ("maf", For "t4")
   ]
 
+testJson :: Test
+testJson = TestCase $ do
+  testData <- BS.readFile "test.json"
+  assertBool "for parsing json" $ parseData testData == Map.singleton
+    "572603298566111241"
+    (Player Town True)
+
+
 tests :: Test
 tests = TestList
   [ TestLabel "test voting"      testVoting
@@ -128,6 +139,7 @@ tests = TestList
   , TestLabel "test basic mafia" testTownWin
   , TestLabel "test basic mafia" testMafiaWin
   , TestLabel "test basic mafia" testValidateVotes
+  , TestLabel "test json parser" testJson
   ]
 
 main :: IO ()
