@@ -7,7 +7,6 @@ import qualified Data.Map                      as Map
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           GHC.Exts                       ( sortWith )
-import           Game                           ( HasElement(..) )
 
 mte :: e -> Maybe a -> Either e a
 mte e Nothing  = Left e
@@ -20,8 +19,8 @@ count x (h : t) = if x /= h then count x t else 1 + count x t
 tally :: Eq a => [a] -> [(a, Int)]
 tally xs = reverse $ sortWith snd $ nub $ map (\x -> (x, count x xs)) xs
 
-isDefault :: (HasElement a, Eq a) => a -> Bool
-isDefault = (==) defaultElement
+-- isDefault :: (HasElement a, Eq a) => a -> Bool
+-- isDefault = (==) defaultElement
 
 mapIndicesToSet :: Ord k => Map k a -> Set k
 mapIndicesToSet = Set.fromList . fmap fst . Map.toList

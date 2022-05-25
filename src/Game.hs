@@ -22,38 +22,48 @@ import           Control.Monad.State            ( State
                                                 )
 import           Debug.Trace                    ( traceShowM )
 
-type Game s r = State s r
+data Emission e = Emission e | Start | Finish
+  deriving (Eq, Show)
+
+type Game s r = State s [Emission r]
 type InputHandler a s r = a -> Game s r
 
-class HasElement a where
-  defaultElement :: a
+-- class HasElement a where
+--   defaultElement :: a
 
-instance (HasElement e) => HasElement (Either e a) where
-  defaultElement = Left defaultElement
+-- instance (HasElement e) => HasElement (Either e a) where
+--   defaultElement = Left defaultElement
 
 -- | Handle a bunch of inputs in sequence.
 play
-  :: (Traversable t, HasElement r)
+  :: (Traversable t)
   => s -- ^ The initial state
   -> InputHandler a s r -- ^ An 'input handler'
   -> t a -- ^ A bunch of inputs
-  -> r -- ^ The end result
+  -> [Emission r] -- ^ The end result
 play initial fn inputs =
-  evalState (foldM (const fn) defaultElement inputs) initial
---  where
---   fn' last = case last of
---     Right res -> const $ finishedGame res
---     Left _  -> fn
+  evalState (foldM fn' [Start] inputs) initial
+ where
+  fn' emissions = case last emissions of
+    Finish -> const $ pure emissions
+    _ -> \input -> do
+      newEmissions <- fn input
+      return $ emissions <> newEmissions
+
 
 -- | The same as 'play', but traces the internal state before accepting each input in the traversable.
 playDebug
-  :: (Traversable t, Show s, HasElement r) => s-> (a -> Game s r) -> t a -> r
-playDebug initial fn inputs = evalState (foldM fn' defaultElement inputs) initial
+  :: (Traversable t, Show s) => s-> (a -> Game s r) -> t a -> [Emission r]
+playDebug initial fn inputs =
+  evalState (foldM fn' [Start] inputs) initial
  where
-  fn' _ = \a -> do
-    st <- get
-    traceShowM st
-    fn a
+  fn' emissions = case last emissions of
+    Finish -> const $ pure emissions
+    _ -> \input -> do
+      st <- get
+      traceShowM st
+      newEmissions <- fn input
+      return $ emissions <> newEmissions
 
 
 -- finishedGame :: r -> Game s r
