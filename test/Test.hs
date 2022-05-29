@@ -6,8 +6,8 @@ import qualified Data.ByteString.Lazy          as BS
 import qualified Data.Map                      as Map
 import           Data.Maybe                     ( isNothing )
 import           Data.Text                      ( Text )
-import           Game                           ( Game
-                                                , HasElement
+import           Game                           ( Emission(..)
+                                                , Game
                                                 , InputHandler
                                                 , play
                                                 , playDebug
@@ -22,7 +22,6 @@ import           Test.HUnit                     ( Assertable(assert)
                                                 , assertBool
                                                 , runTestTT
                                                 )
-import           Util                           ( isDefault )
 import           Voting                         ( Vote(..)
                                                 , VoteResult(..)
                                                 , mkVotingState
@@ -33,9 +32,9 @@ import           Voting                         ( Vote(..)
 type Description = String
 
 testGame
-  :: (Show r, Eq r, Traversable t, HasElement r)
+  :: (Show r, Eq r, Traversable t)
   => Description
-  -> (r -> Bool)
+  -> ([Emission r] -> Bool)
   -> s
   -> InputHandler a s r
   -> t a
@@ -45,9 +44,9 @@ testGame desc cond init handler inputs =
   where output = play init handler inputs
 
 testGameDebug
-  :: (Show s, Show r, Eq r, Traversable t, HasElement r)
+  :: (Show s, Show r, Eq r, Traversable t)
   => Description
-  -> (r -> Bool)
+  -> ([Emission r] -> Bool)
   -> s
   -> InputHandler a s r
   -> t a
@@ -55,6 +54,15 @@ testGameDebug
 testGameDebug desc cond init handler inputs =
   TestCase $ assertBool (desc <> " got " <> show output) $ cond output
   where output = playDebug init handler inputs
+
+emitted :: (Eq r) => r -> [Emission r] -> Bool
+emitted = elem . Emission
+
+didNothing :: [Emission r] -> Bool
+didNothing []              = True
+didNothing [Start]         = True
+didNothing [Start, Finish] = True
+didNothing _               = False
 
 {-
   Tests for the voting game
@@ -66,11 +74,11 @@ votes = [("p1", For "p2"), ("p3", For "p2")]
 
 testVotingEmpty :: Test
 testVotingEmpty =
-  testGame "for voting game with no input," isDefault votingInit vote []
+  testGame "for voting game with no input," didNothing votingInit vote []
 
 testVoting :: Test
 testVoting =
-  testGame "for voting game," ((==) $ Voted "p2") votingInit vote votes
+  testGame "for voting game," (emitted $ Voted "p2") votingInit vote votes
 
 {-
   Tests for the basic version of mafia
@@ -86,14 +94,14 @@ mafiaPlayers = Map.fromList
 
 testEmptyMafia :: Test
 testEmptyMafia = testGame "for basic mafia (no inputs),"
-                          isDefault
+                          didNothing
                           (nightStart mafiaPlayers)
                           basicMafia
                           []
 
 testSimpleTownWin :: Test
 testSimpleTownWin = testGame "for basic mafia (simple town victory),"
-                             ((==) $ TeamWin Town)
+                             (emitted $ TeamWin Town)
                              (nightStart mafiaPlayers)
                              basicMafia
                              [("maf", For "maf")]
@@ -101,7 +109,7 @@ testSimpleTownWin = testGame "for basic mafia (simple town victory),"
 testTownWin :: Test
 testTownWin = testGame
   "for basic mafia (more complex town win),"
-  ((==) $ TeamWin Town)
+  (emitted $ TeamWin Town)
   (nightStart mafiaPlayers)
   basicMafia
   [("maf", For "t4"), ("t1", For "maf"), ("t2", For "maf"), ("t3", For "maf")]
@@ -109,7 +117,7 @@ testTownWin = testGame
 testMafiaWin :: Test
 testMafiaWin = testGame
   "for basic mafia (mafia win),"
-  ((==) $ TeamWin Mafia)
+  (emitted $ TeamWin Mafia)
   (nightStart mafiaPlayers)
   basicMafia
   [ ("maf", For "t4")
@@ -123,7 +131,7 @@ testMafiaWin = testGame
 testValidateVotes :: Test
 testValidateVotes = testGame
   "for basic mafia (validating votes),"
-  isDefault
+  didNothing
   (nightStart mafiaPlayers)
   basicMafia
   [ ("maf", For "t4")

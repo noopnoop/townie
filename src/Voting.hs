@@ -10,6 +10,7 @@
 module Voting
   ( Vote(..)
   , VoteResult(..)
+  , AsVoteResult(..)
   , VotingState
   , mkVotingState
   , vote
@@ -17,7 +18,7 @@ module Voting
   , voting
   ) where
 import           Control.Lens                   ( (^.)
-                                                , makeClassy
+                                                , makeClassy, makeClassyPrisms
                                                 )
 import           Control.Lens.Operators         ( (%~)
                                                 , (&)
@@ -27,11 +28,12 @@ import           Control.Monad.State            ( gets
                                                 )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.Maybe                     ( isJust )
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           GHC.Generics                   ( Generic )
-import           Game                           ( Game
-                                                , HasElement(..)
+import           Game                           ( Emission(..)
+                                                , Game
                                                 , InputHandler
                                                 , play
                                                 )
@@ -41,10 +43,10 @@ data Vote r = NoVote
           | Pass
           | For r deriving (Eq, Show)
 
-data VoteResult r = Passed | Voted r | VoteInProgress deriving (Eq,Show)
+data VoteResult r = Passed | Voted r deriving (Eq,Show)
 
-instance HasElement (VoteResult r) where
-  defaultElement = VoteInProgress
+-- instance HasElement (VoteResult r) where
+--   defaultElement = VoteInProgress
 
 data VotingState p r = VotingState
   { _votes      :: Map p (Vote r)
@@ -53,6 +55,7 @@ data VotingState p r = VotingState
   deriving (Generic, Show)
 
 $(makeClassy ''VotingState)
+$(makeClassyPrisms ''VoteResult)
 
 mkVotingState :: (Ord p, Ord r) => [p] -> [r] -> VotingState p r
 mkVotingState plrs choices =
@@ -66,13 +69,13 @@ votePure player ballot st = st & votes %~ Map.adjust newVote player
     Pass   -> const Pass
     For r  -> if Set.member r (st ^. candidates) then const $ For r else id
 
-votingFinished :: (Eq r, HasVotingState s p r) => s -> VoteResult r
+votingFinished :: (Eq r, HasVotingState s p r) => s -> Maybe (VoteResult r)
 votingFinished st = if majVotes > (numPlayers `div` 2)
   then case majority of
-    NoVote -> VoteInProgress
-    Pass   -> Passed
-    For r  -> Voted r
-  else VoteInProgress
+    NoVote -> Nothing
+    Pass   -> Just Passed
+    For r  -> Just $ Voted r
+  else Nothing
  where
   (majority, majVotes) = head $ tally $ Map.elems $ st ^. votes
   numPlayers           = Map.size $ st ^. votes
@@ -82,11 +85,14 @@ vote
   => InputHandler (p, Vote r) s (VoteResult r)
 vote (player, ballot) = do
   modify $ votePure player ballot
-  gets votingFinished
+  res <- gets votingFinished
+  case res of
+    Nothing -> return []
+    Just vt -> return [Emission vt]
 
 voting
   :: (Ord p, Ord r, Show s, HasVotingState s p r)
   => s
   -> [(p, Vote r)]
-  -> VoteResult r
+  -> [Emission (VoteResult r)]
 voting st = play st vote

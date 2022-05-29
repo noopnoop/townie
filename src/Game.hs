@@ -28,11 +28,6 @@ data Emission e = Emission e | Start | Finish
 type Game s r = State s [Emission r]
 type InputHandler a s r = a -> Game s r
 
--- class HasElement a where
---   defaultElement :: a
-
--- instance (HasElement e) => HasElement (Either e a) where
---   defaultElement = Left defaultElement
 
 -- | Handle a bunch of inputs in sequence.
 play

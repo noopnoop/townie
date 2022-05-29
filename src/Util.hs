@@ -30,3 +30,8 @@ mapIndicesToSet = Set.fromList . fmap fst . Map.toList
 unQuote :: String -> String
 unQuote []       = []
 unQuote (x : xs) = if x == '\"' then init xs else x : xs
+
+safeLast :: [a] -> Maybe a
+safeLast []       = Nothing
+safeLast [x     ] = Just x
+safeLast (x : xs) = safeLast xs
