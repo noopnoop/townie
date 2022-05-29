@@ -93,10 +93,7 @@ validVote (voter, theirVote) st = case theirVote of
   For votee -> checkAlive voter st && checkAlive votee st
 
 handleKill
-  :: ( Show s
-     , HasVotingState s PlayerName PlayerName
-     , HasMafiaState s
-     )
+  :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => Game s MafiaResult
   -> VoteResult PlayerName
   -> Game s MafiaResult
@@ -104,9 +101,10 @@ handleKill next plr = do
   modify $ kill plr
   checkWin <- gets handleWin
   case checkWin of
-    Nothing -> next
-    Just winner ->
-      return [Emission $ VoteRes plr, Emission winner]
+    Nothing -> do
+      doNext <- next
+      return $ [Emission $ VoteRes plr] <> doNext
+    Just winner -> return [Emission $ VoteRes plr, Emission winner]
 
 kill :: (Show s, HasMafiaState s) => VoteResult PlayerName -> s -> s
 kill target st = case target of
@@ -120,18 +118,12 @@ handleWin st | nooneWin st = Just Draw
              | otherwise   = Nothing
 
 dayPhase
-  :: ( Show s
-     , HasVotingState s PlayerName PlayerName
-     , HasMafiaState s
-     )
+  :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => InputHandler MafiaInput s MafiaResult
 dayPhase = handleVote $ changePhase Night >> mkMafiaVote
 
 handleVote
-  :: ( Show s
-     , HasVotingState s PlayerName PlayerName
-     , HasMafiaState s
-     )
+  :: (Show s, HasVotingState s PlayerName PlayerName, HasMafiaState s)
   => Game s MafiaResult
   -> InputHandler MafiaInput s MafiaResult
 handleVote next input = do
