@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-|
 This module contains the 'Game' type and the 'play' function, which must be understood together.
 
@@ -20,10 +21,20 @@ import           Control.Monad.State            ( State
                                                 , evalState
                                                 , get
                                                 )
+import           Data.Aeson                     ( ToJSON(toJSON)
+                                                , Value(Null)
+                                                , defaultOptions
+                                                , genericToJSON
+                                                )
 import           Debug.Trace                    ( traceShowM )
+import           GHC.Generics                   ( Generic )
 
 data Emission e = Emission e | Start | Finish
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance (ToJSON e) => ToJSON (Emission e) where
+  toJSON (Emission e) = toJSON e
+  toJSON x            = genericToJSON defaultOptions x
 
 type Game s r = State s [Emission r]
 type InputHandler a s r = a -> Game s r
@@ -36,25 +47,23 @@ play
   -> InputHandler a s r -- ^ An 'input handler'
   -> t a -- ^ A bunch of inputs
   -> [Emission r] -- ^ The end result
-play initial fn inputs =
-  evalState (foldM fn' [Start] inputs) initial
+play initial fn inputs = evalState (foldM fn' [Start] inputs) initial
  where
   fn' emissions = case last emissions of
     Finish -> const $ pure emissions
-    _ -> \input -> do
+    _      -> \input -> do
       newEmissions <- fn input
       return $ emissions <> newEmissions
 
 
 -- | The same as 'play', but traces the internal state before accepting each input in the traversable.
 playDebug
-  :: (Traversable t, Show s) => s-> (a -> Game s r) -> t a -> [Emission r]
-playDebug initial fn inputs =
-  evalState (foldM fn' [Start] inputs) initial
+  :: (Traversable t, Show s) => s -> (a -> Game s r) -> t a -> [Emission r]
+playDebug initial fn inputs = evalState (foldM fn' [Start] inputs) initial
  where
   fn' emissions = case last emissions of
     Finish -> const $ pure emissions
-    _ -> \input -> do
+    _      -> \input -> do
       st <- get
       traceShowM st
       newEmissions <- fn input

@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Main where
 import           BasicMafia
+import           Data.Aeson                     ( encode )
 import qualified Data.ByteString.Lazy          as BS
 import qualified Data.Map                      as Map
 import           Data.Maybe                     ( isNothing )
@@ -162,17 +163,31 @@ testJson = TestCase $ do
     "572603298566111241"
     (Player Town True)
 
+testToJson :: Test
+testToJson = TestCase $ do
+  let emissions = play
+        (nightStart mafiaPlayers)
+        basicMafia
+        [ ("maf", For "t4")
+        , ("maf", For "t3")
+        , ("t1" , For "t3")
+        , ("t2" , For "t3")
+        , ("maf", For "t2")
+        ]
+  BS.writeFile "writeTest.json" $ encode emissions
+  assertBool "for writing to json" True
 
 tests :: Test
 tests = TestList
-  [ TestLabel "test voting"      testVoting
-  , TestLabel "test voting"      testVotingEmpty
-  , TestLabel "test basic mafia" testEmptyMafia
-  , TestLabel "test basic mafia" testSimpleTownWin
-  , TestLabel "test basic mafia" testTownWin
-  , TestLabel "test basic mafia" testMafiaWin
+  [ TestLabel "test voting"       testVoting
+  , TestLabel "test voting"       testVotingEmpty
+  , TestLabel "test basic mafia"  testEmptyMafia
+  , TestLabel "test basic mafia"  testSimpleTownWin
+  , TestLabel "test basic mafia"  testTownWin
+  , TestLabel "test basic mafia"  testMafiaWin
   -- , TestLabel "test basic mafia" testValidateVotes
-  , TestLabel "test json parser" testJson
+  , TestLabel "test json parser"  testJson
+  , TestLabel "test json encoder" testToJson
   ]
 
 main :: IO ()

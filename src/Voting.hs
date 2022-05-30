@@ -38,15 +38,15 @@ import           Game                           ( Emission(..)
                                                 , play
                                                 )
 import           Util                           ( tally )
+import Data.Aeson (ToJSON)
 
 data Vote r = NoVote
           | Pass
           | For r deriving (Eq, Show)
 
-data VoteResult r = Passed | Voted r deriving (Eq,Show)
+data VoteResult r = Passed | Voted r deriving (Eq,Show, Generic)
 
--- instance HasElement (VoteResult r) where
---   defaultElement = VoteInProgress
+instance (ToJSON r) => ToJSON (VoteResult r)
 
 data VotingState p r = VotingState
   { _votes      :: Map p (Vote r)

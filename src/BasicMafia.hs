@@ -35,6 +35,7 @@ import           Voting                         ( AsVoteResult(..)
                                                 , mkVotingState
                                                 , vote
                                                 )
+import Data.Aeson (ToJSON)
 
 data Player = Player
   { team  :: Team
@@ -43,13 +44,10 @@ data Player = Player
   deriving (Show, Eq)
 type PlayerName = Text
 type Players = Map PlayerName Player
-data Team = Town | Mafia deriving (Show, Eq, Enum)
+data Team = Town | Mafia deriving (Show, Eq, Enum, Generic)
 data Phase = Night | Day deriving (Show, Eq, Enum)
-data MafiaResult = Draw | TeamWin Team | VoteRes (VoteResult PlayerName) deriving (Show, Eq)
+data MafiaResult = Draw | TeamWin Team | VoteRes (VoteResult PlayerName) deriving (Show, Eq, Generic)
 type MafiaInput = (PlayerName, Vote PlayerName)
-
--- instance HasElement MafiaResult where
---   defaultElement = MafiaInProgress :: MafiaResult
 
 data MafiaState = MafiaState
   { _mafiaVotingState :: VotingState PlayerName PlayerName
@@ -60,6 +58,9 @@ data MafiaState = MafiaState
 
 $(makeClassy ''MafiaState)
 $(makeClassyPrisms ''MafiaResult)
+
+instance ToJSON Team
+instance ToJSON MafiaResult
 
 instance HasVotingState MafiaState PlayerName PlayerName where
   votingState = mafiaVotingState
